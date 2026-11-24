@@ -1,6 +1,6 @@
-# app_odontologo
+# DentCalm
 
-A new Flutter project.
+Monitorización respiratoria para la atención odontológica (Flutter + Firebase + BLE).
 
 ## Getting Started
 

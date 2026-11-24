@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
+
+import 'theme/app_icons.dart';
+
+import 'theme/app_theme.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'firebase_options.dart';
-import 'screens/patients_screen.dart';
+import 'screens/app_shell.dart';
+import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
+import 'widgets/ui.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await loadThemeMode();
 
   runApp(const DentCalmApp());
 }
@@ -20,16 +28,18 @@ class DentCalmApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'DentCalm',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2D7FF9),
-        ),
-      ),
-      home: const AuthGate(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'DentCalm',
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: mode,
+          home: const SplashScreen(next: AuthGate()),
+        );
+      },
     );
   }
 }
@@ -43,15 +53,13 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+          return const AppBackground(
+            child: Scaffold(body: Center(child: CircularProgressIndicator())),
           );
         }
 
         if (snapshot.hasData) {
-          return const HomeScreen();
+          return const AppShell(inicio: HomeScreen());
         }
 
         return const LoginScreen();
@@ -72,6 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
 
   bool loading = false;
+  bool _ocultarContrasena = true;
   String? errorMessage;
 
   Future<void> login() async {
@@ -118,126 +127,249 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// "¿Olvidaste tu contraseña?": envía el correo de restablecimiento de
+  /// Firebase Auth. No cambia el inicio de sesión.
+  Future<void> _olvideContrasena() async {
+    final correo = TextEditingController(text: emailController.text.trim());
+    final enviar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Glass.radius),
+        ),
+        title: Text('Restablecer contraseña', style: AppText.titulo(size: 20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Te enviaremos un enlace a tu correo para crear una nueva contraseña.',
+              style: AppText.texto(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: correo,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: Icon(AppIcons.envelopeSimple),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Enviar enlace'),
+          ),
+        ],
+      ),
+    );
+
+    final email = correo.text.trim();
+    correo.dispose();
+    if (enviar != true || email.isEmpty || !mounted) return;
+
+    String mensaje;
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      mensaje =
+          'Si existe una cuenta con $email, recibirás un enlace para '
+          'restablecer tu contraseña.';
+    } on FirebaseAuthException catch (e) {
+      mensaje = e.code == 'invalid-email'
+          ? 'El correo electrónico no es válido.'
+          : 'No se pudo enviar el correo. Inténtalo de nuevo.';
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(mensaje)));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFEFF6FF),
-      body: Center(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 430,
-            ),
-            child: Card(
-              margin: const EdgeInsets.all(24),
-              elevation: 6,
-              child: Padding(
-                padding: const EdgeInsets.all(30),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.medical_services_outlined,
-                      size: 70,
-                      color: Color(0xFF2D7FF9),
-                    ),
+    return AppBackground(
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: GlassCard(
+                    padding: const EdgeInsets.fromLTRB(36, 36, 36, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Center(child: AppLogo(height: 84)),
+                        const SizedBox(height: 28),
 
-                    const SizedBox(height: 15),
-
-                    const Text(
-                      'DentCalm',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      'Monitorización respiratoria',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey,
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Contraseña',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(
-                          color: Colors.red,
+                        Text(
+                          'Iniciar sesión',
+                          textAlign: TextAlign.center,
+                          style: AppText.titulo(size: 26),
                         ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : login,
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(),
-                                )
-                              : const Text(
-                                  'Iniciar sesión',
-                                ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ingresa con tu cuenta de odontólogo',
+                          textAlign: TextAlign.center,
+                          style: AppText.texto(color: Colors.grey),
                         ),
-                      ),
-                    ),
+                        const SizedBox(height: 28),
 
-                    const SizedBox(height: 15),
-
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
+                        Text(
+                          'Correo electrónico',
+                          style: AppText.texto(
+                            size: 14,
+                            weight: FontWeight.w700,
                           ),
-                        );
-                      },
-                      child: const Text(
-                        '¿Primera vez? Crear cuenta',
-                      ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            hintText: 'nombre@clinica.com',
+                            prefixIcon: Icon(AppIcons.envelopeSimple),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+
+                        Text(
+                          'Contraseña',
+                          style: AppText.texto(
+                            size: 14,
+                            weight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: _ocultarContrasena,
+                          onSubmitted: (_) => loading ? null : login(),
+                          decoration: InputDecoration(
+                            hintText: '••••••••',
+                            prefixIcon: const Icon(AppIcons.lockSimple),
+                            suffixIcon: IconButton(
+                              tooltip: _ocultarContrasena
+                                  ? 'Mostrar contraseña'
+                                  : 'Ocultar contraseña',
+                              icon: Icon(
+                                _ocultarContrasena
+                                    ? AppIcons.eye
+                                    : AppIcons.eyeSlash,
+                              ),
+                              onPressed: () => setState(
+                                () => _ocultarContrasena = !_ocultarContrasena,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _olvideContrasena,
+                            child: const Text('¿Olvidaste tu contraseña?'),
+                          ),
+                        ),
+
+                        if (errorMessage != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.danger.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  AppIcons.warningCircle,
+                                  color: AppTheme.danger,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    errorMessage!,
+                                    style: AppText.texto(
+                                      size: 14,
+                                      weight: FontWeight.w600,
+                                      color: AppTheme.danger,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ] else
+                          const SizedBox(height: 6),
+
+                        PrimaryButton(
+                          label: loading ? 'Ingresando...' : 'Ingresar',
+                          loading: loading,
+                          onPressed: login,
+                        ),
+                        const SizedBox(height: 20),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '¿No tienes cuenta?',
+                              style: AppText.texto(color: Colors.grey),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text('Crear cuenta'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
+
+            // Sol / luna arriba a la derecha
+            const Positioned(
+              top: 16,
+              right: 16,
+              child: SafeArea(child: _TemaFlotante()),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// Botón sol/luna sobre una pequeña superficie de vidrio.
+class _TemaFlotante extends StatelessWidget {
+  const _TemaFlotante();
+
+  @override
+  Widget build(BuildContext context) {
+    return const GlassCard(
+      padding: EdgeInsets.all(2),
+      radius: 16,
+      child: ThemeToggleButton(),
     );
   }
 }
@@ -272,15 +404,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final credential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
-      await credential.user?.updateDisplayName(
-        nameController.text.trim(),
-      );
+      await credential.user?.updateDisplayName(nameController.text.trim());
 
       if (mounted) {
         Navigator.pop(context);
@@ -322,463 +452,110 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFEFF6FF),
-      appBar: AppBar(
-        title: const Text('Crear cuenta'),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 430,
-            ),
-            child: Card(
-              margin: const EdgeInsets.all(24),
-              child: Padding(
-                padding: const EdgeInsets.all(30),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Registro del odontólogo',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
+    return AppBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Crear cuenta'),
+          actions: const [ThemeToggleButton(), SizedBox(width: 10)],
+        ),
+        body: Center(
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Card(
+                margin: const EdgeInsets.all(24),
+                child: Padding(
+                  padding: const EdgeInsets.all(30),
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'assets/images/A_icono.png',
+                        height: 64,
+                        semanticLabel: 'DentCalm',
                       ),
-                    ),
 
-                    const SizedBox(height: 25),
-
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre completo',
-                        prefixIcon: Icon(Icons.person_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: 'Correo electrónico',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Contraseña',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: confirmController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Confirmar contraseña',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    if (errorMessage != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(
-                          color: Colors.red,
+
+                      const Text(
+                        'Registro del odontólogo',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 25),
+
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre completo',
+                          prefixIcon: Icon(AppIcons.user),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      TextField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Correo electrónico',
+                          prefixIcon: Icon(AppIcons.envelopeSimple),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      TextField(
+                        controller: passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Contraseña',
+                          prefixIcon: Icon(AppIcons.lockSimple),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      TextField(
+                        controller: confirmController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirmar contraseña',
+                          prefixIcon: Icon(AppIcons.lockSimple),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: PrimaryButton(
+                          label: loading ? 'Creando cuenta...' : 'Crear cuenta',
+                          icon: AppIcons.userPlus,
+                          loading: loading,
+                          onPressed: register,
                         ),
                       ),
                     ],
-
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: loading ? null : register,
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(),
-                                )
-                              : const Text(
-                                  'Crear cuenta',
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final nombre = user?.displayName?.isNotEmpty == true ? user!.displayName! : 'Odontólogo';
-    final uid = user?.uid;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F8FC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'DentCalm',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF12355B)),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-            icon: const Icon(Icons.logout),
-          ),
-          const SizedBox(width: 10),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Bienvenido, $nombre',
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF12355B)),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Monitorización respiratoria para la atención odontológica',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-
-            // BOTONES PRINCIPALES
-            Row(
-              children: [
-                Expanded(
-                  child: _DashboardCard(
-                    icon: Icons.people_alt_outlined,
-                    title: 'Pacientes',
-                    subtitle: 'Registrar y consultar',
-                    color: const Color(0xFF2D7FF9),
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientsScreen()));
-                    },
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: _DashboardCard(
-                    icon: Icons.monitor_heart_outlined,
-                    title: 'Nueva sesión',
-                    subtitle: 'Iniciar monitoreo',
-                    color: const Color(0xFF20A86B),
-                    onTap: () {
-                      // Redirige a pacientes con un aviso
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Selecciona un paciente para iniciar la sesión.')),
-                      );
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientsScreen()));
-                    },
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: _DashboardCard(
-                    icon: Icons.history,
-                    title: 'Historial',
-                    subtitle: 'Consultar sesiones',
-                    color: const Color(0xFF8A5CF6),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Selecciona un paciente para ver su historial.')),
-                      );
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientsScreen()));
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 30),
-
-            // ESTADO DEL SISTEMA
-            Card(
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Padding(
-                padding: const EdgeInsets.all(25),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 65,
-                      height: 65,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE7F0FF),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(Icons.air, size: 35, color: Color(0xFF2D7FF9)),
-                    ),
-                    const SizedBox(width: 20),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Estado del sistema', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          SizedBox(height: 6),
-                          Text('Listo para iniciar una sesión de monitoreo.', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE6F7EF),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.circle, size: 10, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('Preparado', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-            const Text(
-              'Resumen',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF12355B)),
-            ),
-            const SizedBox(height: 15),
-
-            // TARJETAS DE RESUMEN CONECTADAS A FIREBASE
-            if (uid != null)
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('pacientes').where('dentistId', isEqualTo: uid).snapshots(),
-                builder: (context, snapshotPacientes) {
-                  final totalPacientes = snapshotPacientes.data?.docs.length ?? 0;
-
-                  return StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('sesiones').where('dentistId', isEqualTo: uid).snapshots(),
-                    builder: (context, snapshotSesiones) {
-                      final docsSesiones = snapshotSesiones.data?.docs ?? [];
-                      final totalSesiones = docsSesiones.length;
-
-                      // Calcular sesiones de hoy
-                      final now = DateTime.now();
-                      final startOfDay = DateTime(now.year, now.month, now.day);
-                      int sesionesHoy = 0;
-
-                      for (var doc in docsSesiones) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        if (data['fecha'] != null && data['fecha'] is Timestamp) {
-                          final fechaSesion = (data['fecha'] as Timestamp).toDate();
-                          if (fechaSesion.isAfter(startOfDay) || fechaSesion.isAtSameMomentAs(startOfDay)) {
-                            sesionesHoy++;
-                          }
-                        }
-                      }
-
-                      return Row(
-                        children: [
-                          Expanded(child: _SummaryCard(title: 'Pacientes', value: '$totalPacientes', icon: Icons.people_outline)),
-                          const SizedBox(width: 20),
-                          Expanded(child: _SummaryCard(title: 'Sesiones', value: '$totalSesiones', icon: Icons.assignment_outlined)),
-                          const SizedBox(width: 20),
-                          Expanded(child: _SummaryCard(title: 'Hoy', value: '$sesionesHoy', icon: Icons.today_outlined)),
-                        ],
-                      );
-                    },
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
-// TARJETA PRINCIPAL
-class _DashboardCard extends StatelessWidget {
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _DashboardCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-
-      child: Card(
-        elevation: 0,
-        color: Colors.white,
-
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-
-        child: Padding(
-          padding: const EdgeInsets.all(25),
-
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
-
-              Container(
-                width: 60,
-                height: 60,
-
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-
-                child: Icon(
-                  icon,
-                  size: 32,
-                  color: color,
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
-// TARJETA DE RESUMEN
-class _SummaryCard extends StatelessWidget {
-
-  final String title;
-  final String value;
-  final IconData icon;
-
-  const _SummaryCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-
-        child: Row(
-          children: [
-
-            Icon(
-              icon,
-              size: 30,
-              color: const Color(0xFF2D7FF9),
-            ),
-
-            const SizedBox(width: 15),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

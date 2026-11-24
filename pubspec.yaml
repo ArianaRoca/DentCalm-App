@@ -1,5 +1,5 @@
 name: app_odontologo
-description: "A new Flutter project."
+description: "DentCalm - Monitorización respiratoria para la atención odontológica"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -38,10 +38,17 @@ dependencies:
   firebase_auth: ^6.7.0
   cloud_firestore: ^6.10.0
   flutter_web_bluetooth: ^1.1.0
+  shared_preferences: ^2.5.3
+  google_fonts: ^9.0.0
+  phosphor_flutter: ^2.1.0
+  fl_chart: ^1.3.1
+  pdf: ^3.13.1
+  printing: ^5.15.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -60,6 +67,14 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/fondo_claro.png
+    - assets/images/fondo_oscuro.png
+    - assets/images/A_horizontal.png
+    - assets/images/A_horizontal_fondo_oscuro.png
+    - assets/images/A_icono.png
+    - assets/images/A_icono_app_1024.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -91,3 +106,23 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Ícono de la app. Regenerar con: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/images/A_icono_app_1024.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/images/A_icono_app_1024.png"
+    background_color: "#FFFFFF"
+    theme_color: "#2D7FF9"
+  windows:
+    generate: true
+    image_path: "assets/images/A_icono_app_1024.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/images/A_icono_app_1024.png"

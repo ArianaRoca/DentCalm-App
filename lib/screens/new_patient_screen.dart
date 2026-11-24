@@ -2,6 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../theme/app_icons.dart';
+
+import '../theme/app_theme.dart';
+import '../widgets/ui.dart';
+
 class NewPatientScreen extends StatefulWidget {
   const NewPatientScreen({super.key});
 
@@ -40,26 +45,16 @@ class _NewPatientScreenState extends State<NewPatientScreen> {
         edadController.text.trim().isEmpty ||
         sexo == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Completa nombre, edad y sexo.',
-          ),
-        ),
+        const SnackBar(content: Text('Completa nombre, edad y sexo.')),
       );
       return;
     }
 
-    final edad = int.tryParse(
-      edadController.text.trim(),
-    );
+    final edad = int.tryParse(edadController.text.trim());
 
     if (edad == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'La edad debe ser un número entero.',
-          ),
-        ),
+        const SnackBar(content: Text('La edad debe ser un número entero.')),
       );
       return;
     }
@@ -71,9 +66,7 @@ class _NewPatientScreenState extends State<NewPatientScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
 
-      await FirebaseFirestore.instance
-          .collection('pacientes')
-          .add({
+      await FirebaseFirestore.instance.collection('pacientes').add({
         'nombre': nombreController.text.trim(),
         'codigo': codigoController.text.trim(),
         'edad': edad,
@@ -88,24 +81,15 @@ class _NewPatientScreenState extends State<NewPatientScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Paciente registrado correctamente.',
-            ),
-          ),
+          const SnackBar(content: Text('Paciente registrado correctamente.')),
         );
 
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error al guardar: $e',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
       }
     } finally {
       if (mounted) {
@@ -127,200 +111,156 @@ class _NewPatientScreenState extends State<NewPatientScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F8FC),
-
-      appBar: AppBar(
-        title: const Text(
-          'Nuevo paciente',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF12355B),
+    return AppBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Nuevo paciente',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
+          elevation: 0,
+          actions: const [ThemeToggleButton(), SizedBox(width: 10)],
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
 
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(30),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(30),
 
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 650,
-            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 650),
 
-            child: Card(
-              elevation: 0,
+              child: Card(
+                elevation: 0,
 
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
 
-              child: Padding(
-                padding: const EdgeInsets.all(30),
+                child: Padding(
+                  padding: const EdgeInsets.all(30),
 
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
 
-                  children: [
-
-                    const Text(
-                      'Datos del paciente',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF12355B),
-                      ),
-                    ),
-
-                    const SizedBox(height: 25),
-
-                    TextField(
-                      controller: nombreController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre completo',
-                        prefixIcon:
-                            Icon(Icons.person_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    TextField(
-                      controller: codigoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Código del paciente',
-                        hintText: 'Ej. PAC-001',
-                        prefixIcon:
-                            Icon(Icons.badge_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    TextField(
-                      controller: edadController,
-                      keyboardType:
-                          TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Edad',
-                        suffixText: 'años',
-                        prefixIcon:
-                            Icon(Icons.cake_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    DropdownButtonFormField<String>(
-                      value: sexo,
-                      decoration: const InputDecoration(
-                        labelText: 'Sexo',
-                        prefixIcon:
-                            Icon(Icons.wc_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'F',
-                          child: Text('Femenino'),
+                    children: [
+                      const Text(
+                        'Datos del paciente',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
                         ),
-                        DropdownMenuItem(
-                          value: 'M',
-                          child: Text('Masculino'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          sexo = value;
-                        });
-                      },
-                    ),
+                      ),
 
-                    const SizedBox(height: 18),
+                      const SizedBox(height: 25),
 
-                    InkWell(
-                      onTap: seleccionarFecha,
-
-                      child: InputDecorator(
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'Fecha de nacimiento',
-                          prefixIcon: Icon(
-                            Icons.calendar_today_outlined,
-                          ),
+                      TextField(
+                        controller: nombreController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre completo',
+                          prefixIcon: Icon(AppIcons.user),
                           border: OutlineInputBorder(),
                         ),
+                      ),
 
-                        child: Text(
-                          fechaNacimiento == null
-                              ? 'Seleccionar fecha'
-                              : '${fechaNacimiento!.day.toString().padLeft(2, '0')}/'
-                                '${fechaNacimiento!.month.toString().padLeft(2, '0')}/'
-                                '${fechaNacimiento!.year}',
+                      const SizedBox(height: 18),
+
+                      TextField(
+                        controller: codigoController,
+                        decoration: const InputDecoration(
+                          labelText: 'Código del paciente',
+                          hintText: 'Ej. PAC-001',
+                          prefixIcon: Icon(AppIcons.identificationCard),
+                          border: OutlineInputBorder(),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 18),
+                      const SizedBox(height: 18),
 
-                    TextField(
-                      controller: notasController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Notas',
-                        alignLabelWithHint: true,
-                        prefixIcon:
-                            Icon(Icons.notes_outlined),
-                        border: OutlineInputBorder(),
+                      TextField(
+                        controller: edadController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Edad',
+                          suffixText: 'años',
+                          prefixIcon: Icon(AppIcons.cake),
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 30),
+                      const SizedBox(height: 18),
 
-                    SizedBox(
-                      width: double.infinity,
+                      DropdownButtonFormField<String>(
+                        initialValue: sexo,
+                        decoration: const InputDecoration(
+                          labelText: 'Sexo',
+                          prefixIcon: Icon(AppIcons.genderIntersex),
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'F', child: Text('Femenino')),
+                          DropdownMenuItem(
+                            value: 'M',
+                            child: Text('Masculino'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            sexo = value;
+                          });
+                        },
+                      ),
 
-                      child: ElevatedButton.icon(
-                        onPressed:
-                            guardando
-                                ? null
-                                : guardarPaciente,
+                      const SizedBox(height: 18),
 
-                        icon: guardando
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child:
-                                    CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.save_outlined,
-                              ),
+                      InkWell(
+                        onTap: seleccionarFecha,
 
-                        label: Text(
-                          guardando
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Fecha de nacimiento',
+                            prefixIcon: Icon(AppIcons.calendarBlank),
+                            border: OutlineInputBorder(),
+                          ),
+
+                          child: Text(
+                            fechaNacimiento == null
+                                ? 'Seleccionar fecha'
+                                : '${fechaNacimiento!.day.toString().padLeft(2, '0')}/'
+                                      '${fechaNacimiento!.month.toString().padLeft(2, '0')}/'
+                                      '${fechaNacimiento!.year}',
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      TextField(
+                        controller: notasController,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Notas',
+                          alignLabelWithHint: true,
+                          prefixIcon: Icon(AppIcons.notepad),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      SizedBox(
+                        width: double.infinity,
+
+                        child: PrimaryButton(
+                          label: guardando
                               ? 'Guardando...'
                               : 'Guardar paciente',
-                        ),
-
-                        style:
-                            ElevatedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.all(18),
+                          icon: AppIcons.floppyDisk,
+                          loading: guardando,
+                          onPressed: guardarPaciente,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
